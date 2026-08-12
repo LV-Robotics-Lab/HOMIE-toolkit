@@ -7,7 +7,7 @@ This script demonstrates:
   3. Accessing calibration and camera extrinsics
 
 Run from package root:
-  python examples/example_load_annotation.py --data_root /path/to/episode
+  .venv/bin/python examples/example_load_annotation.py --data_root data/xperience-10m-sample
 """
 
 import sys
