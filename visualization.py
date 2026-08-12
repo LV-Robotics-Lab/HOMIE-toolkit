@@ -12,7 +12,6 @@ from rerun.blueprint import (
     Vertical,
     Spatial3DView,
     Spatial2DView,
-    TimePanel,
     TimeSeriesView,
 )
 
@@ -129,23 +128,30 @@ def create_blueprint(
     show_caption=False,
     show_3d_view=True,
 ):
-    """Create Rerun blueprint layout for 3D view, depth, stereo, fisheye, IMU, caption."""
-    caption_left = [
-        rrb.TextDocumentView(origin="captions/Main_Task", name="Main Task"),
-        rrb.TextDocumentView(origin="captions/details/objects", name="Objects"),
-    ] if show_caption else []
-    caption_right = [
-        rrb.TextDocumentView(origin="captions/Sub_Task", name="Sub Task"),
-        rrb.TextDocumentView(origin="captions/details/interaction", name="Interaction"),
-        rrb.TextDocumentView(origin="captions/Current_Action", name="Current Action"),
-    ] if show_caption else []
-    has_caption = bool(caption_left and caption_right)
+    """Create a Rerun layout similar to the Xperience-10M reference viewer."""
+
+    def _vertical(items, row_shares=None):
+        items = [item for item in items if item is not None]
+        if not items:
+            return None
+        kwargs = {}
+        if row_shares is not None and len(row_shares) == len(items):
+            kwargs["row_shares"] = row_shares
+        return Vertical(*items, **kwargs)
+
+    def _horizontal(items, column_shares=None):
+        items = [item for item in items if item is not None]
+        if not items:
+            return None
+        kwargs = {}
+        if column_shares is not None and len(column_shares) == len(items):
+            kwargs["column_shares"] = column_shares
+        return Horizontal(*items, **kwargs)
 
     world_3d_contents = [
         "world/slam_point_cloud",
         "world/stereo/left/**",
         "world/stereo/right/**",
-        "world/fisheye/merged/**",
         "world/fisheye/cam0/camera",
         "world/fisheye/cam1/camera",
         "world/fisheye/cam2/camera",
@@ -155,27 +161,41 @@ def create_blueprint(
         "world/full_body_mocap/**",
         "world/smplh/**",
     ]
-    if show_3d_view:
-        world_column = Vertical(
-            Spatial3DView(
-                name="world/3d_view",
-                origin="/",
-                contents=world_3d_contents,
-                line_grid=rrb.archetypes.LineGrid3D(
-                    visible=True,
-                    plane=rr.components.Plane3D.XY.with_distance(ground_height),
-                ),
-                background=[60, 60, 60],
-            ),
-            TimePanel(),
-        )
-    else:
-        world_column = Vertical(TimePanel())
 
-    if has_caption:
-        caption_panel = Horizontal(
-            Vertical(*caption_left),
-            Vertical(*caption_right, row_shares=[1, 1, 2]),
+    world_view = None
+    if show_3d_view:
+        world_view = Spatial3DView(
+            name="world/3d_view",
+            origin="/",
+            contents=world_3d_contents,
+            line_grid=rrb.archetypes.LineGrid3D(
+                visible=True,
+                plane=rr.components.Plane3D.XY.with_distance(ground_height),
+            ),
+            background=[60, 60, 60],
+        )
+
+    caption_panel = None
+    task_timeline_view = None
+    if show_caption:
+        caption_panel = _horizontal(
+            [
+                _vertical(
+                    [
+                        rrb.TextDocumentView(origin="captions/Main_Task", name="Main Task"),
+                        rrb.TextDocumentView(origin="captions/details/objects", name="Objects"),
+                    ],
+                    row_shares=[1.15, 1.0],
+                ),
+                _vertical(
+                    [
+                        rrb.TextDocumentView(origin="captions/Sub_Task", name="Sub Task"),
+                        rrb.TextDocumentView(origin="captions/details/interaction", name="Interaction"),
+                        rrb.TextDocumentView(origin="captions/Current_Action", name="Current Action"),
+                    ],
+                    row_shares=[0.8, 1.0, 1.45],
+                ),
+            ],
             column_shares=[1, 1],
         )
         task_timeline_view = TimeSeriesView(
@@ -183,56 +203,72 @@ def create_blueprint(
             name="Task Timeline",
             plot_legend=rrb.PlotLegend(visible=True),
         )
-        world_column = Vertical(
-            world_column,
-            caption_panel,
-            task_timeline_view,
-            row_shares=[2, 1, 0.4],
-        )
 
-    views = [world_column]
-    view_2d_list = []
-    if show_depth_colormap:
-        view_2d_list.append(Spatial2DView(name="world/depth/vis", origin="world/depth/vis"))
-    if show_stereo:
-        view_2d_list.append(Spatial2DView(name="world/stereo/vis_cam0", origin="world/stereo/vis_cam0"))
-        view_2d_list.append(Spatial2DView(name="world/stereo/vis_cam1", origin="world/stereo/vis_cam1"))
-    if view_2d_list:
-        views.append(Vertical(*view_2d_list))
+    right_column = _vertical(
+        [world_view, caption_panel, task_timeline_view],
+        row_shares=[2.5, 1.15, 0.55],
+    )
 
+    media_top_columns = []
     if show_fisheye:
-        if show_imu:
-            fisheye_block = Vertical(
-                Horizontal(
-                    Spatial2DView(name="world/fisheye/cam0", origin="world/fisheye/cam0"),
-                    Spatial2DView(name="world/fisheye/cam1", origin="world/fisheye/cam1"),
-                ),
-                Horizontal(
-                    Spatial2DView(name="world/fisheye/cam2", origin="world/fisheye/cam2"),
-                    Spatial2DView(name="world/fisheye/cam3", origin="world/fisheye/cam3"),
-                ),
-            )
-            imu_block = Vertical(
-                TimeSeriesView(name="imu/accel", origin="imu/accel", plot_legend=rrb.PlotLegend(visible=True)),
-                TimeSeriesView(name="imu/gyro", origin="imu/gyro", plot_legend=rrb.PlotLegend(visible=True)),
-            )
-            views.append(Vertical(fisheye_block, imu_block, row_shares=[2, 1]))
-        else:
-            views.append(
-                Vertical(
-                    Horizontal(
+        media_top_columns.extend(
+            [
+                _vertical(
+                    [
                         Spatial2DView(name="world/fisheye/cam0", origin="world/fisheye/cam0"),
-                        Spatial2DView(name="world/fisheye/cam1", origin="world/fisheye/cam1"),
-                    ),
-                    Horizontal(
                         Spatial2DView(name="world/fisheye/cam2", origin="world/fisheye/cam2"),
+                    ],
+                    row_shares=[1, 1],
+                ),
+                _vertical(
+                    [
+                        Spatial2DView(name="world/fisheye/cam1", origin="world/fisheye/cam1"),
                         Spatial2DView(name="world/fisheye/cam3", origin="world/fisheye/cam3"),
-                    ),
-                )
+                    ],
+                    row_shares=[1, 1],
+                ),
+            ]
+        )
+    if show_stereo:
+        media_top_columns.append(
+            _vertical(
+                [
+                    Spatial2DView(name="world/stereo/vis_cam0", origin="world/stereo/vis_cam0"),
+                    Spatial2DView(name="world/stereo/vis_cam1", origin="world/stereo/vis_cam1"),
+                ],
+                row_shares=[1, 1],
             )
+        )
+    media_top = _horizontal(media_top_columns, column_shares=[1] * len(media_top_columns))
 
-    column_shares = [3, 1, 2] if len(views) == 3 else [2, 1]
-    return Blueprint(Horizontal(*views, column_shares=column_shares), collapse_panels=True)
+    media_bottom_items = []
+    if show_imu:
+        media_bottom_items.append(
+            _vertical(
+                [
+                    TimeSeriesView(name="imu/accel", origin="imu/accel", plot_legend=rrb.PlotLegend(visible=True)),
+                    TimeSeriesView(name="imu/gyro", origin="imu/gyro", plot_legend=rrb.PlotLegend(visible=True)),
+                ],
+                row_shares=[1, 1],
+            )
+        )
+    if show_depth_colormap:
+        media_bottom_items.append(Spatial2DView(name="world/depth/vis", origin="world/depth/vis"))
+
+    bottom_column_shares = None
+    if len(media_bottom_items) == 2 and show_imu and show_depth_colormap:
+        bottom_column_shares = [2, 1]
+    elif media_bottom_items:
+        bottom_column_shares = [1] * len(media_bottom_items)
+    media_bottom = _horizontal(media_bottom_items, column_shares=bottom_column_shares)
+
+    left_column = _vertical([media_top, media_bottom], row_shares=[2.2, 1.0])
+
+    root_view = _horizontal(
+        [left_column, right_column],
+        column_shares=[1.15, 1.35],
+    )
+    return Blueprint(root_view, collapse_panels=True)
 
 
 __all__ = [

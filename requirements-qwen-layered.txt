@@ -1,0 +1,6 @@
+# Install PyTorch separately for your CUDA runtime first.
+transformers>=4.51.3
+accelerate>=1.10.0
+safetensors>=0.5.3
+python-pptx>=1.0.2
+git+https://github.com/huggingface/diffusers

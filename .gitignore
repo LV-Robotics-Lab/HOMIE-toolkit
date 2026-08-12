@@ -1,2 +1,7 @@
 __pycache__/
 *.rrd
+*.hdf5
+outputs/
+data/xperience-10m-sample/fisheye_cam1.mp4
+data/xperience-10m-sample/fisheye_cam2.mp4
+/data/xperience-10m

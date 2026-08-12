@@ -20,7 +20,6 @@ __all__ = [
     "load_from_annotation_hdf5",
     "load_calibration_from_annotation_hdf5",
     "list_annotation_contents",
-    "get_cam01",
     "create_blueprint",
     "depth_to_colormap",
     "depth_to_pointcloud",

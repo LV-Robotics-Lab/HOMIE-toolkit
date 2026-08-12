@@ -2,8 +2,8 @@
 Example: Load Xperience-10M data and visualize to Rerun .rrd.
 
 Run from package root:
-  python examples/example_visualize_rrd.py --data_root /path/to/episode
-  Then open: rerun vis.rrd
+  .venv/bin/python examples/example_visualize_rrd.py --data_root data/xperience-10m-sample --output_rrd visualization.rrd
+  Then open: rerun data/xperience-10m-sample/visualization.rrd
 """
 
 import os
@@ -46,7 +46,12 @@ from visualization import (
 def main():
     parser = argparse.ArgumentParser(description="Example: visualize Xperience-10M data to Rerun RRD.")
     parser.add_argument("--data_root", type=str, required=True, help="Episode folder (contains annotation.hdf5)")
-    parser.add_argument("--output_rrd", type=str, default="vis.rrd", help="Output .rrd path")
+    parser.add_argument(
+        "--output_rrd",
+        type=str,
+        default="visualization.rrd",
+        help="Output .rrd path. Relative paths are saved under --data_root.",
+    )
     parser.add_argument("--num_frames", type=int, default=-1, help="Number of frames to log")
 
     # show_* (align with run_vis.py)
@@ -179,7 +184,7 @@ def main():
     ))
     output_path = Path(args.output_rrd)
     if not output_path.is_absolute():
-        output_path = PACKAGE_ROOT / output_path
+        output_path = data_root / output_path
     rr.save(str(output_path))
     rr.set_time("stable_time", duration=0)
 
